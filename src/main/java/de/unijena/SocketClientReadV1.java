@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.charset.Charset;
+import java.util.Base64;
 
 public abstract class SocketClientReadV1 {
 
@@ -200,7 +202,7 @@ public abstract class SocketClientReadV1 {
                 String subject = ""; // The subject of the message
 
                 while (!line.equals(".")) { // Loop through all lines of the message
-                    if (line.startsWith("Date: ") && !foundDate) { // If the line starts with "Date: " and the date has not been printed yet
+                    if (line.toLowerCase().startsWith("date: ") && !foundDate) { // If the line starts with "Date: " and the date has not been printed yet
                         date = line.substring(6); // Get the date
                         foundDate = true; // Set the date to printed
                     }
@@ -213,8 +215,13 @@ public abstract class SocketClientReadV1 {
                     line = reader.readLine(); // Read the next line
                 }
 
+                // date is of format: "Wed, 21 Oct 2015 12:34:56 +0200 (CEST)"
+                // remove everything after 5th space
+                String[] dateParts = date.split(" "); // split the date into parts
+                date = dateParts[0] + " " + dateParts[1] + " " + dateParts[2] + " " + dateParts[3] + " " + dateParts[4]; // get the first 5 parts of the date
+
                 System.out.print("Date: " + date + ", "); // Print the date
-                System.out.println("Subject: " + subject); // Print the subject
+                System.out.println("Subject: " + decodeSubject(subject)); // Print the subject
                 System.out.println(); // Print a new line
             }
         }
@@ -254,6 +261,30 @@ public abstract class SocketClientReadV1 {
             writer.println("QUIT"); // Close the connection (Returns: +OK POP3 server signing off)
             line = reader.readLine(); // Read the response
             socket.close(); // Close the socket
+        }
+    }
+
+    /**
+     * Decodes a given "Subject" String, based on the format that is provided (UTF-8 / utf-8,  iso-8859-1, plaintext), as denoted by "=?(charset)?(encoding)?(encoded text)?="
+     */
+    private static String decodeSubject(String subject) {
+        if (subject.startsWith("=?")) { // If the subject starts with "=?"
+            String[] parts = subject.split("\\?"); // Split the subject into parts
+            String charset = parts[1]; // Get the charset
+            String encoding = parts[2]; // Get the encoding
+            String encodedText = parts[3]; // Get the encoded text
+
+            // TODO split message in parts if there are multiple encoded parts
+            if (encoding.equals("B") || encoding.equals("b")) { // If the encoding is base64
+                return new String(Base64.getDecoder().decode(encodedText), Charset.forName(charset)); // Decode the text
+            } else if (encoding.equals("Q") || encoding.equals("q")) { // If the encoding is quoted-printable
+                // TODO: ä, ö, ü, ß, etc. are not decoded correctly
+                return new String(encodedText.getBytes(), Charset.forName(charset)); // Decode the text
+            } else { // If the encoding is unknown
+                return subject; // Return the subject
+            }
+        } else { // If the subject does not start with "=?"
+            return subject; // Return the subject
         }
     }
 }
