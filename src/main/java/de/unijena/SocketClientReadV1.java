@@ -1,11 +1,8 @@
 package de.unijena;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
-import java.nio.charset.Charset;
+import java.net.URLDecoder;
 import java.util.Base64;
 
 public abstract class SocketClientReadV1 {
@@ -157,10 +154,11 @@ public abstract class SocketClientReadV1 {
          * Connects to the server
          * @param host The host that the client should connect to
          * @param port The port that the client should connect to
-         * @throws Exception If the connection fails
+         * @throws IOException If the connection fails
          */
-        public void connect(String host, int port) throws Exception {
+        public void connect(String host, int port) throws IOException {
             socket = new Socket(host, port);
+            socket.setKeepAlive(true);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             writer = new PrintWriter(socket.getOutputStream(), true);
             line = reader.readLine();
@@ -177,6 +175,9 @@ public abstract class SocketClientReadV1 {
             line = reader.readLine();
             writer.println("PASS " + password);
             line = reader.readLine();
+            if (!line.startsWith("+OK")) {
+                throw new IOException("Authentication failed!");
+            }
         }
 
         /**
@@ -190,6 +191,7 @@ public abstract class SocketClientReadV1 {
             line = reader.readLine(); // Read the response
             numberOfMessages = Integer.parseInt(line.split(" ")[1]); // Get the amount of total messages
 
+            System.out.println(); // Print a new line
             for (int i = 1; i <= numberOfMessages; i++) { // Loop through all messages
                 System.out.print("[" + i + "] "); // Print the message number
                 writer.println("RETR " + i); // Get the message (Returns: +OK message follows, <message>, .) (see https://de.wikipedia.org/wiki/Post_Office_Protocol)
@@ -250,6 +252,10 @@ public abstract class SocketClientReadV1 {
             while (!line.equals(".")) { // Loop through all lines of the message
                 System.out.println(line); // Print the line
                 line = reader.readLine(); // Read the next line
+                if (line.startsWith("-ERR")) { // If the line starts with "-ERR"
+                    System.out.println("Message not found!"); // Print an error message
+                    break; // Break the loop
+                }
             }
         }
 
@@ -265,24 +271,51 @@ public abstract class SocketClientReadV1 {
     }
 
     /**
-     * Decodes a given "Subject" String, based on the format that is provided (UTF-8 / utf-8,  iso-8859-1, plaintext), as denoted by "=?(charset)?(encoding)?(encoded text)?="
+     * Decodes a given "Subject" String, based on the format that is provided (UTF-8 / utf-8,  iso-8859-1, plaintext), as denoted by "=?(charset)?(encoding)?(encoded text)?="<br>
+     * Cases are: <br>
+     * <ul>
+     *     <li>UTF-8 / utf-8: =?UTF-8?Q?Subject?=</li>
+     *     <li>iso-8859-1: =?iso-8859-1?Q?Subject?=</li>
+     *     <li>Subject (Plaintext)</li>
+     * </ul>
+     * [GitHub] Please verify your email address.
+     * <p>
+     * =?iso-8859-1?Q?Mentor*innen_f=FCr_internationale_Studierende_gesucht!?=
+     * <p>
+     * =?UTF-8?Q?[Friedolin]_-_PR=C3=84SENZ_im_WiSe_22?=
+     * <p>
+     * =?utf-8?q?Willkommen_bei_der_=22FSRInfo-News=22_Mailingliste__?=
+     * <p>
+     * =?utf-8?B?TmV1ZXMgYXVzIGRlbSBJbnRlcm5hdGlvbmFsZW4gQsO8cm8gLyBOZXdzIGZy?=
+     * <p>
+     * =?utf-8?B?TGluQWxnIGbDvHIgSW5mbyAoMjAyMik6IExlc2VhdWZnYWJlIGbDvHIgZGk=?=  =?utf-8?B?ZSBMaW5lYXJlIEFsZ2VicmE=?=
      */
     private static String decodeSubject(String subject) {
         if (subject.startsWith("=?")) { // If the subject starts with "=?"
             String[] parts = subject.split("\\?"); // Split the subject into parts
             String charset = parts[1]; // Get the charset
-            String encoding = parts[2]; // Get the encoding
+            String encoding = parts[2].toUpperCase(); // Get the encoding
             String encodedText = parts[3]; // Get the encoded text
 
-            // TODO split message in parts if there are multiple encoded parts
-            if (encoding.equals("B") || encoding.equals("b")) { // If the encoding is base64
-                return new String(Base64.getDecoder().decode(encodedText), Charset.forName(charset)); // Decode the text
-            } else if (encoding.equals("Q") || encoding.equals("q")) { // If the encoding is quoted-printable
-                // TODO: ä, ö, ü, ß, etc. are not decoded correctly
-                return new String(encodedText.getBytes(), Charset.forName(charset)); // Decode the text
-            } else { // If the encoding is unknown
-                return subject; // Return the subject
+            if (encoding.equals("Q")) { // If the encoding is "Q"
+                // use regex
+                encodedText = encodedText.replaceAll("=([0-9A-Fa-f]{2})", "%$1"); // Replace all "=XX" with "%XX"
+
+                try {
+                    return URLDecoder.decode(encodedText, charset); // Decode the encoded text
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+            } else if (encoding.equals("B")) { // If the encoding is "B"
+                byte[] bytes = Base64.getDecoder().decode(encodedText); // Decode the encoded text
+                try {
+                    return new String(bytes, charset); // Decode the encoded text
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
             }
+
+            return subject; // Return the subject
         } else { // If the subject does not start with "=?"
             return subject; // Return the subject
         }
