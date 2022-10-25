@@ -89,9 +89,9 @@ public abstract class SocketClientReadV1 {
         System.out.println("Connected to " + host + " on port " + portNumber + " as " + email);
 
         // Print all message indexes, their date and subject
-        System.out.println("========================================");
+        System.out.println("================================================================================");
         client.printAllMessages();
-        System.out.println("========================================");
+        System.out.println("================================================================================");
 
         // Tell the user how many messages are in the inbox
         int totalAmount = client.getMessageAmount();
@@ -105,20 +105,19 @@ public abstract class SocketClientReadV1 {
             // Check the command against known commands
             try {
                 if (command.equals("close")) { // if the command is close, close the connection
-                    System.out.println("========================================");
+                    System.out.println("================================================================================");
                     break;
                 } else { // if the command is not close, try to parse it as an integer
-                    System.out.println("========================================");
+                    System.out.println("================================================================================");
                     int messageNumber = Integer.parseInt(command); // parse the command as an integer
                     client.printMessage(messageNumber); // print the message with the given number
-                    System.out.println("========================================");
+                    System.out.println("================================================================================");
                 }
             } catch (Exception e) { // if the command is not an integer, print an error message
                 System.out.println("Invalid input!");
-                System.out.println("========================================");
+                System.out.println("================================================================================");
             }
         }
-
 
         System.out.println("Closing connection..."); // tell the user that the connection is closing
         client.close(); // close the connection
@@ -248,14 +247,23 @@ public abstract class SocketClientReadV1 {
          */
         public void printMessage(int messageNumber) throws IOException {
             writer.println("RETR " + messageNumber); // Get the message (Returns: +OK message follows, <message>, .) (see https://de.wikipedia.org/wiki/Post_Office_Protocol)
-            line = reader.readLine(); // Read the response
-            while (!line.equals(".")) { // Loop through all lines of the message
-                System.out.println(line); // Print the line
+            while (true) { // Loop through all lines of the message
                 line = reader.readLine(); // Read the next line
                 if (line.startsWith("-ERR")) { // If the line starts with "-ERR"
                     System.out.println("Message not found!"); // Print an error message
                     break; // Break the loop
+                } else if (line.equals(".")) { // If the line is "."
+                    break; // Break the loop
                 }
+
+                // avoid image base64 blocks because of overflows
+                if (line.startsWith("Content-Transfer-Encoding: base64") || line.startsWith("Content-Type: image/")) {
+                    while (!line.equals(".")) { // Loop through all lines of the message
+                        line = reader.readLine(); // Read the next line
+                    }
+                    break;
+                }
+                System.out.println(line); // Print the line
             }
         }
 
@@ -305,6 +313,7 @@ public abstract class SocketClientReadV1 {
                     return URLDecoder.decode(encodedText, charset); // Decode the encoded text
                 } catch (UnsupportedEncodingException e) {
                     e.printStackTrace();
+                    System.out.println("Unsupported encoding: " + charset);
                 }
             } else if (encoding.equals("B")) { // If the encoding is "B"
                 byte[] bytes = Base64.getDecoder().decode(encodedText); // Decode the encoded text
@@ -312,6 +321,7 @@ public abstract class SocketClientReadV1 {
                     return new String(bytes, charset); // Decode the encoded text
                 } catch (UnsupportedEncodingException e) {
                     e.printStackTrace();
+                    System.out.println("Unsupported encoding: " + charset);
                 }
             }
 
