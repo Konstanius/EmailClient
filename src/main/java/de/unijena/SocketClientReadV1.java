@@ -90,11 +90,11 @@ public abstract class SocketClientReadV1 {
 
         // Print all message indexes, their date and subject
         System.out.println("================================================================================");
-        client.printAllMessages();
+        client.printAllMails();
         System.out.println("================================================================================");
 
         // Tell the user how many messages are in the inbox
-        int totalAmount = client.getMessageAmount();
+        int totalAmount = client.getMailAmount();
         System.out.println("Total amount of messages: " + totalAmount);
 
         // Listen for commands from the user
@@ -110,7 +110,7 @@ public abstract class SocketClientReadV1 {
                 } else { // if the command is not close, try to parse it as an integer
                     System.out.println("================================================================================");
                     int messageNumber = Integer.parseInt(command); // parse the command as an integer
-                    client.printMessage(messageNumber); // print the message with the given number
+                    client.printMail(messageNumber); // print the message with the given number
                     System.out.println("================================================================================");
                 }
             } catch (Exception e) { // if the command is not an integer, print an error message
@@ -183,7 +183,7 @@ public abstract class SocketClientReadV1 {
          * Prints all emails that are found in the inbox of the user
          * @throws IOException If the reading of the emails fails
          */
-        public void printAllMessages() throws IOException {
+        public void printAllMails() throws IOException {
             int numberOfMessages; // Amount of total messages
 
             writer.println("STAT"); // Get the amount of total messages (Returns: +OK <number of messages> <total size of messages>)
@@ -222,7 +222,7 @@ public abstract class SocketClientReadV1 {
                 date = dateParts[0] + " " + dateParts[1] + " " + dateParts[2] + " " + dateParts[3] + " " + dateParts[4]; // get the first 5 parts of the date
 
                 System.out.print("Date: " + date + ", "); // Print the date
-                System.out.println("Subject: " + decodeSubject(subject)); // Print the subject
+                System.out.println("Subject: " + anyDecode(subject)); // Print the subject
                 System.out.println(); // Print a new line
             }
         }
@@ -232,7 +232,7 @@ public abstract class SocketClientReadV1 {
          * @return The total amount of messages in the inbox of the user
          * @throws IOException If the reading of the emails fails
          */
-        int getMessageAmount() throws IOException {
+        int getMailAmount() throws IOException {
             int numberOfMessages; // Amount of total messages
             writer.println("STAT"); // Get the amount of total messages (Returns: +OK <number of messages> <total size of messages>)
             line = reader.readLine(); // Read the response
@@ -245,26 +245,81 @@ public abstract class SocketClientReadV1 {
          * @param messageNumber The number of the message that should be printed
          * @throws IOException If the reading of the emails fails
          */
-        public void printMessage(int messageNumber) throws IOException {
+        public void printMail(int messageNumber) throws IOException {
             writer.println("RETR " + messageNumber); // Get the message (Returns: +OK message follows, <message>, .) (see https://de.wikipedia.org/wiki/Post_Office_Protocol)
-            while (true) { // Loop through all lines of the message
-                line = reader.readLine(); // Read the next line
-                if (line.startsWith("-ERR")) { // If the line starts with "-ERR"
-                    System.out.println("Message not found!"); // Print an error message
-                    break; // Break the loop
-                } else if (line.equals(".")) { // If the line is "."
-                    break; // Break the loop
-                }
 
-                // avoid image base64 blocks because of overflows
-                if (line.startsWith("Content-Transfer-Encoding: base64") || line.startsWith("Content-Type: image/")) {
-                    while (!line.equals(".")) { // Loop through all lines of the message
-                        line = reader.readLine(); // Read the next line
-                    }
+            String sender = ""; // The sender of the message
+            String date = ""; // The date of the message
+            String receiver = ""; // The receiver of the message
+            String subject = ""; // The subject of the message
+            StringBuilder body = new StringBuilder(); // The body of the message
+
+            boolean bodyMode = false; // If the body of the message is being read
+            while (true) { // Loop through all lines of the message
+                String newLine = reader.readLine(); // Read the next line
+
+                if (newLine.equals(".")) { // If the line is a dot, break the loop
                     break;
                 }
-                System.out.println(line); // Print the line
+
+                // if the newLine starts with "    " or " ", add newLine to line
+                if (newLine.startsWith("   ") || newLine.startsWith(" ") ) {
+                    line += newLine;
+                } else {
+                    if (line.startsWith("-ERR")) { // If the line starts with "-ERR"
+                        System.out.println("Message not found!"); // Print an error message
+                        break; // Break the loop
+                    } else if (line.equals(".")) { // If the line is "."
+                        break; // Break the loop
+                    }
+
+                    // avoid image base64 blocks because of overflows
+                    if (line.toLowerCase().startsWith("content-transfer-encoding: base64") || line.toLowerCase().startsWith("content-type: image/")) {
+                        while (!line.equals(".")) { // Loop through all lines of the message
+                            line = reader.readLine(); // Read the next line
+                        }
+                        break;
+                    }
+
+                    if (line.toLowerCase().startsWith("from: ")) { // If the line starts with "From: ", split by <
+                        sender = line.substring(6).split("<")[1].trim(); // Get the sender
+                        sender = sender.split(">")[0].trim(); // Remove the >
+                    }
+
+                    else if (line.toLowerCase().startsWith("date: ")) { // If the line starts with "Date: "
+                        String[] dateParts = line.substring(6).split(" "); // split the date into parts
+                        date = dateParts[0] + " " + dateParts[1] + " " + dateParts[2] + " " + dateParts[3] + " " + dateParts[4]; // get the first 5 parts of the date
+                    }
+
+                    else if (line.toLowerCase().startsWith("to: ")) { // If the line starts with "To: ", split by <
+                        receiver = line.substring(4).split("<")[1].trim(); // Get the receiver
+                        receiver = receiver.split(">")[0].trim(); // Remove the >
+                    }
+
+                    else if (line.toLowerCase().startsWith("subject: ")) { // If the line starts with "Subject: "
+                        subject = anyDecode(line.substring(9)); // Get the subject
+                    }
+
+                    else if (line.toLowerCase().startsWith("content-type: text/plain; charset=")) { // If the line starts with "Content-Type: text/plain; charset="
+                        bodyMode = true; // Set the body mode to true
+                    }
+
+                    if (bodyMode) { // If the body mode is true
+                        body.append(line).append("\n"); // Add the line to the body
+                    }
+
+                    line = newLine;
+                }
             }
+
+            // Print the sender, date, receiver, subject and body
+            System.out.println("Sender: " + sender);
+            System.out.println("Date: " + date);
+            System.out.println("Receiver: " + receiver);
+            System.out.println("Subject: " + subject);
+            // divider
+            System.out.println("=====================================================");
+            System.out.println(body);
         }
 
         /**
@@ -298,34 +353,45 @@ public abstract class SocketClientReadV1 {
      * <p>
      * =?utf-8?B?TGluQWxnIGbDvHIgSW5mbyAoMjAyMik6IExlc2VhdWZnYWJlIGbDvHIgZGk=?=  =?utf-8?B?ZSBMaW5lYXJlIEFsZ2VicmE=?=
      */
-    private static String decodeSubject(String subject) {
+    private static String anyDecode(String subject) {
         if (subject.startsWith("=?")) { // If the subject starts with "=?"
-            String[] parts = subject.split("\\?"); // Split the subject into parts
-            String charset = parts[1]; // Get the charset
-            String encoding = parts[2].toUpperCase(); // Get the encoding
-            String encodedText = parts[3]; // Get the encoded text
+            String[] splits = subject.split("=\\?"); // Split the subject by "=?"
+            StringBuilder decoded = new StringBuilder(); // The decoded subject
 
-            if (encoding.equals("Q")) { // If the encoding is "Q"
-                // use regex
-                encodedText = encodedText.replaceAll("=([0-9A-Fa-f]{2})", "%$1"); // Replace all "=XX" with "%XX"
+            for (String split : splits) {
+                try {
+                    if (split.isBlank()) { // If the split is blank, continue
+                        continue;
+                    }
 
-                try {
-                    return URLDecoder.decode(encodedText, charset); // Decode the encoded text
-                } catch (UnsupportedEncodingException e) {
-                    e.printStackTrace();
-                    System.out.println("Unsupported encoding: " + charset);
-                }
-            } else if (encoding.equals("B")) { // If the encoding is "B"
-                byte[] bytes = Base64.getDecoder().decode(encodedText); // Decode the encoded text
-                try {
-                    return new String(bytes, charset); // Decode the encoded text
-                } catch (UnsupportedEncodingException e) {
-                    e.printStackTrace();
-                    System.out.println("Unsupported encoding: " + charset);
-                }
+                    String[] parts = split.split("\\?"); // Split the subject into parts
+                    String charset = parts[0]; // Get the charset
+                    String encoding = parts[1].toUpperCase(); // Get the encoding
+                    String encodedText = parts[2]; // Get the encoded text
+
+                    if (encoding.equals("Q")) { // If the encoding is "Q"
+                        // use regex
+                        encodedText = encodedText.replaceAll("=([0-9A-Fa-f]{2})", "%$1"); // Replace all "=XX" with "%XX"
+
+                        try {
+                            decoded.append(URLDecoder.decode(encodedText, charset)); // Decode the encoded text
+                        } catch (UnsupportedEncodingException e) {
+                            e.printStackTrace();
+                            System.out.println("Unsupported encoding: " + charset);
+                        }
+                    } else if (encoding.equals("B")) { // If the encoding is "B"
+                        byte[] bytes = Base64.getDecoder().decode(encodedText); // Decode the encoded text
+                        try {
+                            decoded.append(new String(bytes, charset)); // Decode the bytes
+                        } catch (UnsupportedEncodingException e) {
+                            e.printStackTrace();
+                            System.out.println("Unsupported encoding: " + charset);
+                        }
+                    }
+                } catch (Exception ignored) {}
             }
 
-            return subject; // Return the subject
+            return decoded.toString(); // Return the subject
         } else { // If the subject does not start with "=?"
             return subject; // Return the subject
         }
