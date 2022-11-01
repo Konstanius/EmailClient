@@ -13,7 +13,7 @@ public abstract class SocketClientReadV1 {
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 
         // Get the host that the user wants to connect to, default to pop3.uni-jena.de
-        System.out.println("Enter the host you want to connect to ('pop3.uni-jena.de'): ");
+        System.out.println("[OPTIONAL] Enter the host you want to connect to ('pop3.uni-jena.de'): ");
         String host;
         while (true) {
             host = br.readLine();
@@ -33,7 +33,7 @@ public abstract class SocketClientReadV1 {
         }
 
         // Check whether the user wants to connect with or without SSL
-        System.out.println("Do you want to connect with SSL? (y/n): ");
+        System.out.println("[REQUIRED] Do you want to connect with SSL? (y/n): ");
         boolean secure = false;
         while (true) {
             String secureInput = br.readLine();
@@ -50,7 +50,7 @@ public abstract class SocketClientReadV1 {
         }
 
         // Get the port that the user wants to connect to, default to 110 / 995 (depending on whether SSL is used)
-        System.out.println("Enter the port you want to connect to ('" + (secure ? "995" : "110") + "'): ");
+        System.out.println("[OPTIONAL] Enter the port you want to connect to ('" + (secure ? "995" : "110") + "'): ");
         int portNumber = secure ? 995 : 110;
         while (true) {
             String port = br.readLine();
@@ -70,7 +70,7 @@ public abstract class SocketClientReadV1 {
         }
 
         // Get the username that the user wants to use
-        System.out.println("Enter your username ('max.mustermann'): ");
+        System.out.println("[REQUIRED] Enter your username ('max.mustermann'): ");
         String email;
         while (true) {
             email = br.readLine();
@@ -88,7 +88,7 @@ public abstract class SocketClientReadV1 {
         email = email + "@uni-jena.de";
 
         // Get the password that the user wants to use
-        System.out.println("Enter your password ('password'): ");
+        System.out.println("[REQUIRED] Enter your password ('password'): ");
         String password;
         while (true) {
             password = br.readLine();
@@ -132,7 +132,7 @@ public abstract class SocketClientReadV1 {
                     client.printMail(messageNumber); // print the message with the given number
                     System.out.println("================================================================================");
                 }
-            } catch (Exception e) { // if the command is not an integer, print an error message
+            } catch (NumberFormatException e) { // if the command is not an integer, print an error message
                 System.out.println("Invalid input!");
                 System.out.println("================================================================================");
             }
@@ -352,12 +352,11 @@ public abstract class SocketClientReadV1 {
             }
 
             // Print the sender, date, receiver, subject and body
-            System.out.println("Sender: " + sender);
             System.out.println("Date: " + date);
+            System.out.println("Sender: " + sender);
             System.out.println("Receiver: " + receiver);
             System.out.println("Subject: " + subject);
-            // divider
-            System.out.println("=====================================================");
+            System.out.println("======================== Body =============================");
             System.out.println(body);
         }
 

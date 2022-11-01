@@ -19,6 +19,15 @@ public abstract class Main {
             }
             return true;
         });
+        commands.put("APIClientReadV1", (bool) -> { // Command for the first version of the JavaMail API client to read emails from the server
+            try {
+                APIClientReadV1.main();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
+            return true;
+        });
 
         System.out.println("Enter the name of the class you want to run: "); // Ask the user for the name of the class he wants to run
         System.out.println("Available classes: " + commands.keySet()); // Print all available classes
