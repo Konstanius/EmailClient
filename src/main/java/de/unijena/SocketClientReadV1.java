@@ -1,5 +1,7 @@
 package de.unijena;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
 import java.net.Socket;
 import java.net.URLDecoder;
@@ -30,9 +32,26 @@ public abstract class SocketClientReadV1 {
             }
         }
 
-        // Get the port that the user wants to connect to, default to 110
-        System.out.println("Enter the port you want to connect to (110): ");
-        int portNumber = 110;
+        // Check whether the user wants to connect with or without SSL
+        System.out.println("Do you want to connect with SSL? (y/n): ");
+        boolean secure = false;
+        while (true) {
+            String secureInput = br.readLine();
+
+            // if the input is not a number, it is invalid, else it is valid
+            if (secureInput.equalsIgnoreCase("y")) {
+                secure = true;
+                break;
+            } else if (secureInput.equalsIgnoreCase("n")) {
+                break;
+            } else {
+                System.out.println("Invalid input. Please enter 'y' or 'n': ");
+            }
+        }
+
+        // Get the port that the user wants to connect to, default to 110 / 995 (depending on whether SSL is used)
+        System.out.println("Enter the port you want to connect to ('" + (secure ? "995" : "110") + "'): ");
+        int portNumber = secure ? 995 : 110;
         while (true) {
             String port = br.readLine();
 
@@ -46,7 +65,7 @@ public abstract class SocketClientReadV1 {
                 portNumber = Integer.parseInt(port);
                 break;
             } catch (NumberFormatException e) {
-                System.out.println("Invalid port number. Please enter a valid port number or leave the field empty to use the default port (110): ");
+                System.out.println("Invalid port number. Please enter a valid port number or leave the field empty to use the default port (" + (secure ? "995" : "110") + "): ");
             }
         }
 
@@ -84,7 +103,7 @@ public abstract class SocketClientReadV1 {
 
         // Initiate, connect and authenticate the client
         Client client = new Client();
-        client.connect(host, portNumber);
+        client.connect(host, portNumber, secure);
         client.authenticate(email, password);
         System.out.println("Connected to " + host + " on port " + portNumber + " as " + email);
 
@@ -130,6 +149,11 @@ public abstract class SocketClientReadV1 {
         Socket socket;
 
         /**
+         * The secure socket that is used to connect to the server
+         */
+        SSLSocket sslSocket;
+
+        /**
          * The buffered reader that is used to read the input from the server
          */
         BufferedReader reader;
@@ -145,6 +169,11 @@ public abstract class SocketClientReadV1 {
         String line;
 
         /**
+         * Whether to use SSL or not
+         */
+        boolean secure;
+
+        /**
          * The constructor of the client
          */
         public Client() {}
@@ -155,12 +184,22 @@ public abstract class SocketClientReadV1 {
          * @param port The port that the client should connect to
          * @throws IOException If the connection fails
          */
-        public void connect(String host, int port) throws IOException {
-            socket = new Socket(host, port);
-            socket.setKeepAlive(true);
-            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            writer = new PrintWriter(socket.getOutputStream(), true);
-            line = reader.readLine();
+        public void connect(String host, int port, boolean secure) throws IOException {
+            this.secure = secure;
+            if (secure) {
+                SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+                sslSocket = (SSLSocket) factory.createSocket(host, port);
+                sslSocket.setKeepAlive(true);
+                reader = new BufferedReader(new InputStreamReader(sslSocket.getInputStream()));
+                writer = new PrintWriter(sslSocket.getOutputStream(), true);
+                line = reader.readLine();
+            } else {
+                socket = new Socket(host, port);
+                socket.setKeepAlive(true);
+                reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                writer = new PrintWriter(socket.getOutputStream(), true);
+                line = reader.readLine();
+            }
         }
 
         /**
@@ -329,7 +368,11 @@ public abstract class SocketClientReadV1 {
         public void close() throws IOException {
             writer.println("QUIT"); // Close the connection (Returns: +OK POP3 server signing off)
             line = reader.readLine(); // Read the response
-            socket.close(); // Close the socket
+            if (secure) { // If the connection is secure
+                socket.close(); // Close the socket
+            } else { // If the connection is not secure
+                sslSocket.close(); // Close the socket
+            }
         }
     }
 
