@@ -1,5 +1,7 @@
 package de.unijena;
 
+import com.sun.mail.pop3.POP3SSLStore;
+
 import javax.mail.*;
 import javax.mail.internet.MimeMultipart;
 import java.io.BufferedReader;
@@ -115,13 +117,24 @@ public abstract class APIClientReadV1 {
         Session session = Session.getInstance(properties);
 
         // Create a new Store object
-        Store store = session.getStore("pop3");
+        POP3SSLStore sslStore = null;
+        Store store;
+        if (secure) {
+            sslStore = new POP3SSLStore(session, null);
+            store = sslStore;
+        } else {
+            store = session.getStore("pop3");
+        }
 
         // Connect to the server
-        store.connect(email, password);
+        if (secure) {
+            sslStore.connect(host, portNumber, email, password);
+        } else {
+            store.connect(host, portNumber, email, password);
+        }
 
         // Get the inbox folder
-        Folder inbox = store.getFolder("INBOX");
+        Folder inbox = secure ? sslStore.getFolder("INBOX") : store.getFolder("INBOX");
 
         // Open the inbox folder
         inbox.open(Folder.READ_ONLY);
@@ -195,6 +208,10 @@ public abstract class APIClientReadV1 {
         br.close();
 
         // Close the connection to the server
-        store.close();
+        if (secure) {
+            sslStore.close();
+        } else {
+            store.close();
+        }
     }
 }
