@@ -238,7 +238,7 @@ public abstract class SocketClientReadV1 {
                 boolean foundSubject = false; // If the subject has already been printed
 
                 String date = ""; // The date of the message
-                String subject = ""; // The subject of the message
+                StringBuilder subject = new StringBuilder(); // The subject of the message
 
                 while (!line.equals(".")) { // Loop through all lines of the message
                     if (line.toLowerCase().startsWith("date: ") && !foundDate) { // If the line starts with "Date: " and the date has not been printed yet
@@ -247,8 +247,17 @@ public abstract class SocketClientReadV1 {
                     }
 
                     if (line.startsWith("Subject: ") && !foundSubject) { // If the line starts with "Subject: " and the subject has not been printed yet
-                        subject = line.substring(9); // Get the subject
+                        subject = new StringBuilder(line.substring(9)); // Get the subject
                         foundSubject = true; // Set the subject to printed
+
+                        // while the line starts with " " it still belongs to the subject
+                        do {
+                            line = reader.readLine(); // Read the next line
+                            if (line.startsWith(" ")) { // If the line starts with " "
+                                subject.append(line.substring(1)); // Append the line to the subject
+                            }
+                        } while (line.startsWith(" ")); // If the next line starts with "Subject: ", read the next line
+                        continue;
                     }
 
                     line = reader.readLine(); // Read the next line
@@ -260,7 +269,7 @@ public abstract class SocketClientReadV1 {
                 date = dateParts[0] + " " + dateParts[1] + " " + dateParts[2] + " " + dateParts[3] + " " + dateParts[4]; // get the first 5 parts of the date
 
                 System.out.print("Date: " + date + ", "); // Print the date
-                System.out.println("Subject: " + anyDecode(subject)); // Print the subject
+                System.out.println("Subject: " + anyDecode(subject.toString())); // Print the subject
                 System.out.println(); // Print a new line
             }
         }
