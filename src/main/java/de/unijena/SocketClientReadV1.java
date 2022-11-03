@@ -351,7 +351,7 @@ public abstract class SocketClientReadV1 {
                         subject = anyDecode(line.substring(9)); // Get the subject
                     }
 
-                    else if (line.toLowerCase().startsWith("content-type: text/plain; charset=")) { // If the line starts with "Content-Type: text/plain; charset="
+                    else if (line.toLowerCase().startsWith("content-type: text/")) { // If the line starts with "Content-Type: text/plain; charset="
                         bodyMode = true; // Set the body mode to true
                     }
 
