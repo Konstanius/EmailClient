@@ -118,10 +118,9 @@ public abstract class APIClientReadV1 {
 
         // Create a new Store object
         POP3SSLStore sslStore = null;
-        Store store;
+        Store store = null;
         if (secure) {
             sslStore = new POP3SSLStore(session, null);
-            store = sslStore;
         } else {
             store = session.getStore("pop3");
         }
@@ -172,9 +171,13 @@ public abstract class APIClientReadV1 {
                         System.out.println("================================================================================");
                     } else {
                         String sender = messages[index].getFrom()[0].toString();
-                        sender = sender.substring(sender.indexOf("<") + 1, sender.indexOf(">"));
+                        if (sender.contains("<")) {
+                            sender = sender.substring(sender.indexOf("<") + 1, sender.indexOf(">"));
+                        }
                         String receiver = messages[index].getAllRecipients()[0].toString();
-                        receiver = receiver.substring(receiver.indexOf("<") + 1, receiver.indexOf(">"));
+                        if (receiver.contains("<")) {
+                            receiver = receiver.substring(receiver.indexOf("<") + 1, receiver.indexOf(">"));
+                        }
 
                         // print the message
                         System.out.println("================================================================================");

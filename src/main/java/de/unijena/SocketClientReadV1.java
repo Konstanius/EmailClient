@@ -192,14 +192,13 @@ public abstract class SocketClientReadV1 {
                 sslSocket.setKeepAlive(true);
                 reader = new BufferedReader(new InputStreamReader(sslSocket.getInputStream()));
                 writer = new PrintWriter(sslSocket.getOutputStream(), true);
-                line = reader.readLine();
             } else {
                 socket = new Socket(host, port);
                 socket.setKeepAlive(true);
                 reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 writer = new PrintWriter(socket.getOutputStream(), true);
-                line = reader.readLine();
             }
+            line = reader.readLine();
         }
 
         /**
@@ -321,8 +320,10 @@ public abstract class SocketClientReadV1 {
                     }
 
                     if (line.toLowerCase().startsWith("from: ")) { // If the line starts with "From: ", split by <
-                        sender = line.substring(6).split("<")[1].trim(); // Get the sender
-                        sender = sender.split(">")[0].trim(); // Remove the >
+                        sender = line.substring(6).trim(); // Get the sender
+                        if (sender.contains("<")) {
+                            sender = sender.substring(sender.indexOf("<") + 1, sender.indexOf(">"));
+                        }
                     }
 
                     else if (line.toLowerCase().startsWith("date: ")) { // If the line starts with "Date: "
@@ -331,8 +332,10 @@ public abstract class SocketClientReadV1 {
                     }
 
                     else if (line.toLowerCase().startsWith("to: ")) { // If the line starts with "To: ", split by <
-                        receiver = line.substring(4).split("<")[1].trim(); // Get the receiver
-                        receiver = receiver.split(">")[0].trim(); // Remove the >
+                        receiver = line.substring(4).trim(); // Get the receiver
+                        if (receiver.contains("<")) {
+                            receiver = receiver.substring(receiver.indexOf("<") + 1, receiver.indexOf(">"));
+                        }
                     }
 
                     else if (line.toLowerCase().startsWith("subject: ")) { // If the line starts with "Subject: "
@@ -368,9 +371,9 @@ public abstract class SocketClientReadV1 {
             writer.println("QUIT"); // Close the connection (Returns: +OK POP3 server signing off)
             line = reader.readLine(); // Read the response
             if (secure) { // If the connection is secure
-                socket.close(); // Close the socket
-            } else { // If the connection is not secure
                 sslSocket.close(); // Close the socket
+            } else { // If the connection is not secure
+                socket.close(); // Close the socket
             }
         }
     }
