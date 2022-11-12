@@ -310,7 +310,7 @@ public abstract class SocketClientReadV1 {
                 }
 
                 // if the newLine starts with "    " or " ", add newLine to line
-                if (newLine.startsWith("   ") || newLine.startsWith(" ") ) {
+                if ((newLine.startsWith("   ") || newLine.startsWith(" ") || newLine.startsWith("\t")) && !bodyMode) {
                     line += newLine;
                 } else {
                     if (line.startsWith("-ERR")) { // If the line starts with "-ERR"
